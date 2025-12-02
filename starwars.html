@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star War API</title>
+</head>
+<body>
+  <body>
+    <h1>Buscando personaje de Star Wars API</h1>
+  
+    <input id="personajeId" type="number" placeholder="ID del personaje (1 - 83)">
+    <button id="buscar">Buscar</button>
+    <button id="favorito" disabled>Agregar a favoritos</button>
+  
+    <h2>Resultado:</h2>
+    <div id="resultado"></div>
+  
+    <h2>Favoritos</h2>
+    <ul id="listaFavoritos"></ul>
+  
+    
+    <script>
+      const btnBuscar = document.getElementById("buscar");
+      const btnFavorito = document.getElementById("favorito");
+      const resultado = document.getElementById("resultado");
+      const listaFavoritos = document.getElementById("listaFavoritos");
+  
+      const FAVORITES_KEY = "sw_favoritos";
+      let personajeActual = null;
+  
+      btnBuscar.addEventListener("click", buscarPersonaje);
+      btnFavorito.addEventListener("click", agregarAFavoritos);
+  
+      async function buscarPersonaje() {
+        const id = document.getElementById("personajeId").value;
+  
+        if (!id) {
+          resultado.innerHTML = "<p>Por favor escribe un ID.</p>";
+          return;
+        }
+  
+        try {
+          resultado.innerHTML = "<p>Cargando personaje...</p>";
+          btnFavorito.disabled = true;
+          personajeActual = null;
+  
+          const respuesta = await fetch(`https://swapi.dev/api/people/${id}/`);
+  
+          if (!respuesta.ok) {
+            throw new Error("No se encontró el personaje (código " + respuesta.status + ")");
+          }
+  
+          const personaje = await respuesta.json();
+  
+          personajeActual = {
+            id: Number(id),
+            name: personaje.name
+          };
+  
+          resultado.innerHTML = `
+            <p><strong>Nombre:</strong> ${personaje.name}</p>
+            <p><strong>Altura:</strong> ${personaje.height} cm</p>
+            <p><strong>Año de nacimiento:</strong> ${personaje.birth_year}</p>
+            <p><strong>Películas:</strong> cargando...</p>
+          `;
+  
+          const filmsTitles = await obtenerTitulosPeliculas(personaje.films);
+  
+          resultado.innerHTML += `
+            <ul>
+              ${filmsTitles.map(titulo => `<li>${titulo}</li>`).join("")}
+            </ul>
+          `;
+  
+          btnFavorito.disabled = false;
+  
+        } catch (error) {
+          resultado.innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
+          btnFavorito.disabled = true;
+        }
+      }
+  
+      async function obtenerTitulosPeliculas(urlsDePeliculas) {
+        const respuestas = await Promise.all(
+          urlsDePeliculas.map(url => fetch(url))
+        );
+  
+        const datosPeliculas = await Promise.all(
+          respuestas.map(res => res.json())
+        );
+  
+        return datosPeliculas.map(pelicula => pelicula.title);
+      }
+  
+      function obtenerFavoritos() {
+        const data = localStorage.getItem(FAVORITES_KEY);
+        return data ? JSON.parse(data) : [];
+      }
+  
+      function guardarFavoritos(favoritos) {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoritos));
+      }
+  
+      function agregarAFavoritos() {
+        if (!personajeActual) return;
+  
+        let favoritos = obtenerFavoritos();
+  
+        const yaExiste = favoritos.some(fav => fav.id === personajeActual.id);
+        if (yaExiste) {
+          alert("Este personaje ya está en favoritos.");
+          return;
+        }
+  
+        favoritos.push(personajeActual);
+        guardarFavoritos(favoritos);
+        renderizarFavoritos();
+      }
+  
+      function renderizarFavoritos() {
+        const favoritos = obtenerFavoritos();
+        listaFavoritos.innerHTML = "";
+  
+        if (favoritos.length === 0) {
+          listaFavoritos.innerHTML = "<li>No hay favoritos aún.</li>";
+          return;
+        }
+  
+        favoritos.forEach(fav => {
+          const li = document.createElement("li");
+          li.textContent = `${fav.name} (ID: ${fav.id})`;
+          listaFavoritos.appendChild(li);
+        });
+      }
+  
+      renderizarFavoritos();
+    </script>
+  </body>
+  </html>
+
+</body>
+</html>
